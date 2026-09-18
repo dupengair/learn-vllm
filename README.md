@@ -17,6 +17,7 @@
 vllm/
 ├── README.md                            # 本文件
 ├── CLAUDE.md                            # Claude Code 协作指引（仓库约定与硬性约束）
+├── .gitignore                           # 忽略 __pycache__ / .claude / .codegraph
 │
 │  ── 服务端脚本（阻塞运行，起 OpenAI 兼容服务于 localhost:8000）──
 ├── test_vllm_qwen3-0.6b.py              # 基座模型服务（served-model-name: qwen3-0.6b）
@@ -82,6 +83,58 @@ nvidia-smi
 - `tool_choice="required"` / guided decoding 等结构化输出在 0.10.2 的 **V0 引擎上已静默移除**（参数被接受但无人执行），本机禁用。
 - 小模型（0.6B 级）选工具全靠 description 文本：相似工具必须写互斥的正反条件；工具调用场景建议降温至 0~0.2。
 - 执行侧永远用 `{函数名: 函数对象}` 映射表查表调用，禁止 `eval` 模型输出的函数名。
+
+## 附：推送 GitHub 的认证踩坑与后续推送方法
+
+### 问题与定位（2026-09-18）
+
+首次推送 `git push -u origin main` 报错：
+
+```
+remote: Invalid username or token. Password authentication is not supported for Git operations.
+```
+
+定位三步，每步一条命令：
+
+| 步骤 | 命令 | 结果与结论 |
+|---|---|---|
+| 1 | `git remote -v` | remote 是 **HTTPS** 地址（`https://github.com/dupengair/learn-vllm.git`）→ 走的密码认证路径 |
+| 2 | `ls ~/.ssh/` | 已有现成的 `id_ed25519` 密钥对 → SSH 方案零成本 |
+| 3 | `ssh -T git@github.com` | 返回 `Hi dupengair!`（exit=1 属正常，GitHub 不提供 shell）→ 密钥早已绑定账户，只差把 remote 切到 SSH |
+
+**根因**：GitHub 自 2021 年 8 月起禁止账户密码做 Git 操作，HTTPS 推送时"密码"处必须填 Personal Access Token（PAT）；当时填的是登录密码，所以被拒。报错 `Invalid username or token` 并非用户名错误——`dupengair@163.com` 只是注册邮箱，推送认的是**用户名** `dupengair` + 有效 token。
+
+**修复**（一条命令切换认证方式，之后永久免密）：
+
+```bash
+git remote set-url origin git@github.com:dupengair/learn-vllm.git
+git push -u origin main   # → 成功
+```
+
+### 后续新仓库推送方法（SSH）
+
+本机 SSH 密钥已绑定 GitHub 账户，新仓库推送流程：
+
+```bash
+cd <新仓库目录>
+git init -b main
+git remote add origin git@github.com:dupengair/<新仓库名>.git   # 注意用 SSH 地址，不用 HTTPS
+git add .
+git commit -m "初始提交"
+git push -u origin main
+```
+
+推送前自检（一条命令判断密钥是否就绪）：
+
+```bash
+ssh -T git@github.com
+# "Hi dupengair!"                → 已绑定，直接推
+# "Permission denied (publickey)" → 按下面两步补救：
+#   1) 生成密钥（~/.ssh/ 已有则跳过）：ssh-keygen -t ed25519 -C "dupengair@163.com"
+#   2) cat ~/.ssh/id_ed25519.pub 的内容粘贴到 GitHub → Settings → SSH and GPG keys → New SSH key
+```
+
+**备选（HTTPS + PAT）**：在无 SSH 密钥的机器上，到 GitHub → Settings → Developer settings → Personal access tokens 生成 token（勾选 `repo` 权限），推送时用户名填账户名、密码处粘贴 token。注意 PAT 有有效期，过期需更换；SSH 是长期方案。
 
 ## 文档索引
 
