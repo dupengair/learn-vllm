@@ -1,0 +1,9 @@
+# Python 运行产物
+__pycache__/
+*.py[cod]
+
+# Claude Code 本地会话配置
+.claude/
+
+# CodeGraph 代码索引（本地生成，体积大）
+.codegraph/
